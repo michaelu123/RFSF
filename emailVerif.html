@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+  </head>
+  <body>
+    <p>
+      <?= anrede ?>,<br /><br />
+      wir haben von Ihnen eine Anmeldung für einen Radfahrkurs erhalten.<br />
+      <? for (let msg of msgs) { ?>
+        <p>
+          <?= msg ?>
+        </p>
+      <? } ?>  
+      Wir möchten wissen: War die Anmeldung wirklich von Ihnen?<br />
+      Wenn ja, klicken Sie bitte auf
+      <a href="<?= verifLink ?>">diesen Link</a>.<br />
+      Heute oder morgen schicken wir Ihnen noch eine Mail, dass Sie einen Platz im Kurs bekommen haben.<br />
+      Mit freundlichen Grüßen,<br />
+      <br />
+      Allgemeiner Deutscher Fahrrad-Club München e.V.<br />
+      Platenstraße 4<br />
+      80336 München<br />
+      Tel. 089 | 773429 Fax 089 | 778537<br />
+      radfahrschule@adfc-muenchen.de<br />
+      www.adfc-muenchen.de<br />
+    </p>
+  </body>
+</html>
