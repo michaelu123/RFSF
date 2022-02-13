@@ -664,12 +664,13 @@ function updateForm() {
   }
   let choices = [];
   let descs = [];
+  // https://lingojam.com/BoldTextGenerator
   for (let type of [
-    "Grundkurse",
-    "Aufbaukurse",
-    "Pedelec-Training für Senioren",
+    "G𝗚𝗿𝘂𝗻𝗱𝗸𝘂𝗿𝘀𝗲",
+    "A𝗔𝘂𝗳𝗯𝗮𝘂𝗸𝘂𝗿𝘀𝗲",
+    "P𝗣𝗲𝗱𝗲𝗹𝗲𝗰-𝗧𝗿𝗮𝗶𝗻𝗶𝗻𝗴 𝗳ü𝗿 𝗦𝗲𝗻𝗶𝗼𝗿𝗲𝗻",
   ]) {
-    descs.push(type + ":");
+    descs.push(type.substr(1) + ":");
     for (let kursObj of kurseObjs) {
       let mr: string = kursObj["Kursname"];
       if (!mr.endsWith(type[0])) continue;
@@ -703,10 +704,13 @@ function updateForm() {
   let beschreibung: string;
   if (choices.length === 0) {
     beschreibung = "Leider sind alle Kurse ausgebucht!\n" + descs.join("\n");
+    form.setAcceptingResponses(false);
+    form.setCustomClosedFormMessage("Leider sind alle Kurse ausgebucht!\n");
   } else {
     beschreibung =
       "Wählen Sie einen Kurs.\nBitte beachten Sie die Anzahl noch freier Plätze!\n" +
       descs.join("\n");
+    form.setAcceptingResponses(true);
   }
   kurseItem.setHelpText(beschreibung);
   kurseItem.setChoices(choices);
