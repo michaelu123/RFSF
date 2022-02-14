@@ -22,7 +22,6 @@ let kursIndexB: number; // Welchen Kurs möchten Sie belegen?
 let herrFrauIndex: number; // Anrede
 let nameIndex: number; // Name
 let mitgliedsNummerIndex: number; // ADFC-Mitgliedsnummer falls Mitglied
-let zahlungsArtIndex: number; // Zahlungsart
 let zustimmungsIndex: number; // Zustimmung zur SEPA-Lastschrift
 let bestätigungsIndex: number; // Bestätigung (der Teilnahmebedingungen)
 let verifikationsIndex: number; // Verifikation (der Email-Adresse)
@@ -68,7 +67,6 @@ function test() {
       Vorname: ["Michael"],
       Name: ["Uhlenberg"],
       Anrede: ["Herr"],
-      Zahlungsart: ["Überweisung"],
       "E-Mail-Adresse": ["michael.uhlenberg@t-online.de"],
       "Lastschrift: IBAN-Kontonummer": ["DE91100000000123456789"],
       [kursFrage]: ["RFS_1F01G"],
@@ -115,7 +113,6 @@ function init() {
       mitgliedsNummerIndex =
         sheetHeaders["ADFC-Mitgliedsnummer falls Mitglied"];
       nameIndex = sheetHeaders["Name"];
-      zahlungsArtIndex = sheetHeaders["Zahlungsart"];
       zustimmungsIndex = sheetHeaders["Zustimmung zur SEPA-Lastschrift"];
       bestätigungsIndex = sheetHeaders["Bestätigung"];
       verifikationsIndex = sheetHeaders["Verifikation"];
@@ -177,12 +174,14 @@ function attachmentFiles() {
   let parent = thisFile.getParents().next();
   let grandPa = parent.getParents().next();
   let attachmentFolder = grandPa
-    .getFoldersByName("Texte für Fahrsicherheitstrainings")
+    .getFoldersByName("Anhänge für Fortgeschrittene")
     .next();
   let PDFs = attachmentFolder.getFilesByType("application/pdf"); // MimeType.PDF
   let files = [];
   while (PDFs.hasNext()) {
-    files.push(PDFs.next());
+    let n = PDFs.next();
+    Logger.log("PDF %s", n.getName());
+    files.push(n);
   }
   return files; // why not use PDFs directly??
 }
@@ -190,7 +189,7 @@ function attachmentFiles() {
 function kursPreis(kurs: string, mitgliedsNummer: string): number {
   if (kurs.endsWith("G")) return isEmpty(mitgliedsNummer) ? 30 : 15;
   if (kurs.endsWith("A")) return isEmpty(mitgliedsNummer) ? 40 : 20;
-  if (kurs.endsWith("P")) return isEmpty(mitgliedsNummer) ? 20 : 10;
+  if (kurs.endsWith("P")) return isEmpty(mitgliedsNummer) ? 30 : 15;
   return 9999;
 }
 
@@ -240,9 +239,8 @@ function anmeldebestätigung() {
   let name = rowValues[nameIndex - 1];
   // Anrede
   let anrede: string = anredeText(herrFrau, name);
-  let template: GoogleAppsScript.HTML.HtmlTemplate = HtmlService.createTemplateFromFile(
-    "emailBestätigung.html",
-  );
+  let template: GoogleAppsScript.HTML.HtmlTemplate =
+    HtmlService.createTemplateFromFile("emailBestätigung.html");
 
   let kurs: string = rowValues[kursIndexB - 1];
   let kursDesc: string = "";
@@ -252,19 +250,10 @@ function anmeldebestätigung() {
   let mitgliedsNummer: string = rowValues[mitgliedsNummerIndex - 1];
 
   let betrag: number = kursPreis(kurs, mitgliedsNummer);
-  let einzug: boolean = rowValues[zahlungsArtIndex - 1].startsWith("SEPA");
-  let zahlungsText: string;
-  if (einzug) {
-    zahlungsText =
-      'Sie haben als Zahlungsart "SEPA Lastschrift" gewählt. Wir ziehen die Teilnahmegebühr von ' +
-      betrag +
-      "€ in den nächsten Tagen ein.";
-  } else {
-    zahlungsText =
-      "Bitte überweisen Sie " +
-      betrag +
-      "€ auf das Konto DE62 7015 0000 0904 1577 81 bei der Stadtsparkasse München unter Angabe der Kursnummer.";
-  }
+  let zahlungsText =
+    "Wir ziehen die Teilnahmegebühr von " +
+    betrag +
+    "€ in den nächsten Tagen ein.";
 
   let kursRow = null;
   let kurseS: Array<Array<string>> = kurseSheet.getSheetValues(
@@ -415,23 +404,21 @@ function checkBuchung(e: Event) {
   let cellA = range.getCell(1, 1);
   Logger.log("sheet %s row %s cellA %s", sheet, row, cellA.getA1Notation());
 
-  if (e.namedValues["Zahlungsart"][0].startsWith("SEPA")) {
-    let ibanNV = e.namedValues["Lastschrift: IBAN-Kontonummer"][0];
-    let iban = ibanNV.replace(/\s/g, "").toUpperCase();
-    let emailTo = e.namedValues["E-Mail-Adresse"][0].toLowerCase().trim();
-    Logger.log("iban=%s emailTo=%s %s", iban, emailTo, typeof emailTo);
-    if (!isValidIban(iban)) {
-      sendWrongIbanEmail(anrede(e), emailTo, iban);
-      cellA.setNote("Ungültige IBAN");
-      return;
-    }
-    if (iban != ibanNV) {
-      let cellIban = range.getCell(
-        1,
-        headers["Buchungen"]["Lastschrift: IBAN-Kontonummer"],
-      );
-      cellIban.setValue(iban);
-    }
+  let ibanNV = e.namedValues["Lastschrift: IBAN-Kontonummer"][0];
+  let iban = ibanNV.replace(/\s/g, "").toUpperCase();
+  let emailTo = e.namedValues["E-Mail-Adresse"][0].toLowerCase().trim();
+  Logger.log("iban=%s emailTo=%s %s", iban, emailTo, typeof emailTo);
+  if (!isValidIban(iban)) {
+    sendWrongIbanEmail(anrede(e), emailTo, iban);
+    cellA.setNote("Ungültige IBAN");
+    return;
+  }
+  if (iban != ibanNV) {
+    let cellIban = range.getCell(
+      1,
+      headers["Buchungen"]["Lastschrift: IBAN-Kontonummer"],
+    );
+    cellIban.setValue(iban);
   }
   // Die Zellen Zustimmung und Bestätigung sind im Formular als Pflichtantwort eingetragen
   // und können garnicht anders als gesetzt sein. Sonst hier prüfen analog zu IBAN.
@@ -503,9 +490,8 @@ function sendeAntwort(
     }
   }
 
-  let template: GoogleAppsScript.HTML.HtmlTemplate = HtmlService.createTemplateFromFile(
-    templateFile,
-  );
+  let template: GoogleAppsScript.HTML.HtmlTemplate =
+    HtmlService.createTemplateFromFile(templateFile);
   template.anrede = anrede(e);
   template.msgs = msgs;
   template.verifLink =
