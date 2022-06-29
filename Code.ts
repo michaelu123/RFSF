@@ -195,6 +195,7 @@ function kursPreis(kurs: string, mitgliedsNummer: string): number {
 
 function anmeldebestätigung() {
   if (!inited) init();
+  if (!updateReste()) return;
   let sheet = SpreadsheetApp.getActiveSheet();
   if (sheet.getName() != "Buchungen") {
     SpreadsheetApp.getUi().alert(
@@ -246,7 +247,7 @@ function anmeldebestätigung() {
   let kursDesc: string = "";
   if (kurs.endsWith("G")) kursDesc = "Grundkurs Fahrsicherheitstraining";
   if (kurs.endsWith("A")) kursDesc = "Aufbaukurs Fahrsicherheitstraining";
-  if (kurs.endsWith("P")) kursDesc = "Pedelectraining für Senioren";
+  if (kurs.endsWith("P")) kursDesc = "Fahrsicherheitstraining für Senior:innen";
   let mitgliedsNummer: string = rowValues[mitgliedsNummerIndex - 1];
 
   let betrag: number = kursPreis(kurs, mitgliedsNummer);
@@ -541,7 +542,7 @@ function update() {
   docLock.releaseLock();
 }
 
-function updateReste() {
+function updateReste(): boolean {
   let kurseRows = kurseSheet.getLastRow() - 1; // first row = headers
   let kurseCols = kurseSheet.getLastColumn();
   let kurseVals = kurseSheet.getRange(2, 1, kurseRows, kurseCols).getValues();
@@ -551,6 +552,7 @@ function updateReste() {
   let buchungenCols = buchungenSheet.getLastColumn();
   let buchungenVals: any[][];
   let buchungenNotes: string[][];
+  let res = true;
   // getRange with 0 rows throws an exception instead of returning an empty array
   if (buchungenRows == 0) {
     buchungenVals = [];
@@ -586,6 +588,7 @@ function updateReste() {
     if (rest < 0) {
       SpreadsheetApp.getUi().alert("Der Kurs '" + kurs + "' ist überbucht!");
       rest = 0;
+      res = false;
     }
     let restR: number = kurseVals[r][restIndex - 1];
     if (rest !== restR) {
@@ -601,6 +604,7 @@ function updateReste() {
       );
     }
   }
+  return res;
 }
 
 function updateForm() {
@@ -616,13 +620,16 @@ function updateForm() {
     let kurseObj: MapS2S = {};
     for (let hdr in kurseHdrs) {
       let idx = kurseHdrs[hdr];
+      if (idx > restIndex) continue;
       // Logger.log("hdr %s %s", hdr, idx);
       kurseObj[hdr] = kurseVals[i][idx - 1];
     }
     let ok = true;
     // check if all cells of Kurse row are nonempty
     for (let hdr in kurseHdrs) {
-      if (!hdr.startsWith("Tag") && isEmpty(kurseObj[hdr])) ok = false;
+      let idx = kurseHdrs[hdr];
+      if (idx > restIndex) continue;
+      if (isEmpty(kurseObj[hdr])) ok = false;
     }
     // if (ok) {
     //   ok = +kurseObj["DZ-Rest"] > 0 || +kurseObj["EZ-Rest"] > 0;
@@ -650,11 +657,11 @@ function updateForm() {
   }
   let choices = [];
   let descs = [];
-  // https://lingojam.com/BoldTextGenerator
+  // https://lingojam.com/BoldTextGenerator bold sans serif
   for (let type of [
     "G𝗚𝗿𝘂𝗻𝗱𝗸𝘂𝗿𝘀𝗲",
     "A𝗔𝘂𝗳𝗯𝗮𝘂𝗸𝘂𝗿𝘀𝗲",
-    "P𝗣𝗲𝗱𝗲𝗹𝗲𝗰-𝗧𝗿𝗮𝗶𝗻𝗶𝗻𝗴 𝗳ü𝗿 𝗦𝗲𝗻𝗶𝗼𝗿𝗲𝗻",
+    "P𝗙𝗮𝗵𝗿𝘀𝗶𝗰𝗵𝗲𝗿𝗵𝗲𝗶𝘁𝘀𝘁𝗿𝗮𝗶𝗻𝗶𝗻𝗴 𝗳ü𝗿 𝗦𝗲𝗻𝗶𝗼𝗿:𝗶𝗻𝗻𝗲𝗻",
   ]) {
     descs.push(type.substr(1) + ":");
     for (let kursObj of kurseObjs) {
