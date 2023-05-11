@@ -22,6 +22,8 @@ let kursIndexB: number; // Welchen Kurs möchten Sie belegen?
 let herrFrauIndex: number; // Anrede
 let nameIndex: number; // Name
 let mitgliedsNummerIndex: number; // ADFC-Mitgliedsnummer falls Mitglied
+let hatGutscheinIndex: number; // Haben Sie einen Gutschein?
+let gutscheinCodeIndex: number; // Gutschein-Code
 let zustimmungsIndex: number; // Zustimmung zur SEPA-Lastschrift
 let bestätigungsIndex: number; // Bestätigung (der Teilnahmebedingungen)
 let verifikationsIndex: number; // Verifikation (der Email-Adresse)
@@ -113,6 +115,8 @@ function init() {
       mitgliedsNummerIndex =
         sheetHeaders["ADFC-Mitgliedsnummer falls Mitglied"];
       nameIndex = sheetHeaders["Name"];
+      hatGutscheinIndex = sheetHeaders["Haben Sie einen Gutschein?"];
+      gutscheinCodeIndex = sheetHeaders["Gutschein-Code"];
       zustimmungsIndex = sheetHeaders["Zustimmung zur SEPA-Lastschrift"];
       bestätigungsIndex = sheetHeaders["Bestätigung"];
       verifikationsIndex = sheetHeaders["Verifikation"];
@@ -189,7 +193,7 @@ function attachmentFiles() {
 function kursPreis(kurs: string, mitgliedsNummer: string): number {
   if (kurs.endsWith("G")) return isEmpty(mitgliedsNummer) ? 30 : 15;
   if (kurs.endsWith("A")) return isEmpty(mitgliedsNummer) ? 40 : 20;
-  if (kurs.endsWith("P")) return isEmpty(mitgliedsNummer) ? 30 : 15;
+  if (kurs.endsWith("S")) return isEmpty(mitgliedsNummer) ? 30 : 15;
   return 9999;
 }
 
@@ -247,7 +251,7 @@ function anmeldebestätigung() {
   let kursDesc: string = "";
   if (kurs.endsWith("G")) kursDesc = "Grundkurs Fahrsicherheitstraining";
   if (kurs.endsWith("A")) kursDesc = "Aufbaukurs Fahrsicherheitstraining";
-  if (kurs.endsWith("P")) kursDesc = "Fahrsicherheitstraining für Senior:innen";
+  if (kurs.endsWith("S")) kursDesc = "Fahrsicherheitstraining für Senior:innen";
   let mitgliedsNummer: string = rowValues[mitgliedsNummerIndex - 1];
 
   let betrag: number = kursPreis(kurs, mitgliedsNummer);
@@ -392,9 +396,9 @@ function sendVerifEmail(rowValues: any[]) {
     "Allgemeiner Deutscher Fahrrad-Club München e.V.\n" +
     "Platenstraße 4\n" +
     "80336 München\n" +
-    "Tel. 089 | 773429 Fax 089 | 778537\n" +
+    "Tel. 089 | 46133830 (Mo. bis Mi. + Fr.)\n" +
     "radfahrschule@adfc-muenchen.de\n" +
-    "www.adfc-muenchen.de\n";
+    "https://muenchen.adfc.de/radfahrschule\n";
   GmailApp.sendEmail(empfaenger, subject, body);
 }
 
@@ -405,21 +409,24 @@ function checkBuchung(e: Event) {
   let cellA = range.getCell(1, 1);
   Logger.log("sheet %s row %s cellA %s", sheet, row, cellA.getA1Notation());
 
-  let ibanNV = e.namedValues["Lastschrift: IBAN-Kontonummer"][0];
-  let iban = ibanNV.replace(/\s/g, "").toUpperCase();
-  let emailTo = e.namedValues["E-Mail-Adresse"][0].toLowerCase().trim();
-  Logger.log("iban=%s emailTo=%s %s", iban, emailTo, typeof emailTo);
-  if (!isValidIban(iban)) {
-    sendWrongIbanEmail(anrede(e), emailTo, iban);
-    cellA.setNote("Ungültige IBAN");
-    return;
-  }
-  if (iban != ibanNV) {
-    let cellIban = range.getCell(
-      1,
-      headers["Buchungen"]["Lastschrift: IBAN-Kontonummer"],
-    );
-    cellIban.setValue(iban);
+  let gutSchein = e.namedValues["Gutschein-Code"][0].trim();
+  if (gutSchein.length == 0) {
+    let ibanNV = e.namedValues["Lastschrift: IBAN-Kontonummer"][0];
+    let iban = ibanNV.replace(/\s/g, "").toUpperCase();
+    let emailTo = e.namedValues["E-Mail-Adresse"][0].toLowerCase().trim();
+    Logger.log("iban=%s emailTo=%s %s", iban, emailTo, typeof emailTo);
+    if (!isValidIban(iban)) {
+      sendWrongIbanEmail(anrede(e), emailTo, iban);
+      cellA.setNote("Ungültige IBAN");
+      return;
+    }
+    if (iban != ibanNV) {
+      let cellIban = range.getCell(
+        1,
+        headers["Buchungen"]["Lastschrift: IBAN-Kontonummer"],
+      );
+      cellIban.setValue(iban);
+    }
   }
   // Die Zellen Zustimmung und Bestätigung sind im Formular als Pflichtantwort eingetragen
   // und können garnicht anders als gesetzt sein. Sonst hier prüfen analog zu IBAN.
@@ -661,7 +668,7 @@ function updateForm() {
   for (let type of [
     "G𝗚𝗿𝘂𝗻𝗱𝗸𝘂𝗿𝘀𝗲",
     "A𝗔𝘂𝗳𝗯𝗮𝘂𝗸𝘂𝗿𝘀𝗲",
-    "P𝗙𝗮𝗵𝗿𝘀𝗶𝗰𝗵𝗲𝗿𝗵𝗲𝗶𝘁𝘀𝘁𝗿𝗮𝗶𝗻𝗶𝗻𝗴 𝗳ü𝗿 𝗦𝗲𝗻𝗶𝗼𝗿:𝗶𝗻𝗻𝗲𝗻",
+    "S𝗙𝗮𝗵𝗿𝘀𝗶𝗰𝗵𝗲𝗿𝗵𝗲𝗶𝘁𝘀𝘁𝗿𝗮𝗶𝗻𝗶𝗻𝗴 𝗳ü𝗿 𝗦𝗲𝗻𝗶𝗼𝗿:𝗶𝗻𝗻𝗲𝗻",
   ]) {
     descs.push(type.substr(1) + ":");
     for (let kursObj of kurseObjs) {
@@ -704,9 +711,9 @@ function updateForm() {
       "Wählen Sie einen Kurs.\nBitte beachten Sie die Anzahl noch freier Plätze!\n" +
       descs.join("\n");
     form.setAcceptingResponses(true);
+    kurseItem.setChoices(choices);
   }
   kurseItem.setHelpText(beschreibung);
-  kurseItem.setChoices(choices);
 }
 
 function sendWrongIbanEmail(anrede: string, empfaenger: string, iban: string) {
@@ -723,9 +730,9 @@ function sendWrongIbanEmail(anrede: string, empfaenger: string, iban: string) {
     "Allgemeiner Deutscher Fahrrad-Club München e.V.\n" +
     "Platenstraße 4\n" +
     "80336 München\n" +
-    "Tel. 089 | 773429 Fax 089 | 778537\n" +
+    "Tel. 089 | 46133830 (Mo. bis Mi. + Fr.)\n" +
     "radfahrschule@adfc-muenchen.de\n" +
-    "www.adfc-muenchen.de\n";
+    "https://muenchen.adfc.de/radfahrschule\n";
 
   GmailApp.sendEmail(empfaenger, subject, body);
 }
