@@ -1053,6 +1053,7 @@ function checkBuchungManually() {
       Name: [brow[nameIndex - 1]],
       Anrede: [brow[herrFrauIndex - 1]],
       "E-Mail-Adresse": [brow[mailIndex - 1]],
+      "Gutschein-Code": [brow[gutscheinCodeIndex - 1]],
       "Lastschrift: IBAN-Kontonummer": [
         brow[headers["Buchungen"]["Lastschrift: IBAN-Kontonummer"] - 1],
       ],
