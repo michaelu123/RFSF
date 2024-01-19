@@ -51,7 +51,7 @@ let printCols = new Map([
 
 const kursFrage = "Welchen Kurs möchten Sie belegen?";
 
-interface Event {
+interface SSEvent {
   namedValues: { [others: string]: string[] };
   range: GoogleAppsScript.Spreadsheet.Range;
   [others: string]: any;
@@ -64,7 +64,7 @@ function isEmpty(str: string | undefined | null) {
 
 function test() {
   init();
-  let e: Event = {
+  let e: SSEvent = {
     namedValues: {
       Vorname: ["Michael"],
       Name: ["Uhlenberg"],
@@ -82,6 +82,8 @@ function init() {
   let ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheets = ss.getSheets();
   for (let sheet of sheets) {
+    let numRows = sheet.getLastRow();
+    if (numRows == 0) continue;
     let sheetName = sheet.getName();
     let sheetHeaders: MapS2I = {};
     // Logger.log("sheetName %s", sheetName);
@@ -191,9 +193,9 @@ function attachmentFiles() {
 }
 
 function kursPreis(kurs: string, mitgliedsNummer: string): number {
-  if (kurs.endsWith("G")) return isEmpty(mitgliedsNummer) ? 30 : 15;
-  if (kurs.endsWith("A")) return isEmpty(mitgliedsNummer) ? 40 : 20;
-  if (kurs.endsWith("S")) return isEmpty(mitgliedsNummer) ? 30 : 15;
+  if (kurs.endsWith("G")) return isEmpty(mitgliedsNummer) ? 35 : 20;
+  if (kurs.endsWith("A")) return isEmpty(mitgliedsNummer) ? 45 : 30;
+  if (kurs.endsWith("S")) return isEmpty(mitgliedsNummer) ? 35 : 20;
   return 9999;
 }
 
@@ -315,10 +317,11 @@ function onOpen() {
     .addItem("Anmeldebestätigung senden", "anmeldebestätigung")
     .addItem("Update", "update")
     .addItem("Kursteilnehmer drucken", "printKursMembers")
+    .addItem("Anmeldung prüfen", "checkBuchungManually")
     .addToUi();
 }
 
-function dispatch(e: Event) {
+function dispatch(e: SSEvent) {
   let docLock = LockService.getScriptLock();
   let locked = docLock.tryLock(30000);
   if (!locked) {
@@ -396,13 +399,13 @@ function sendVerifEmail(rowValues: any[]) {
     "Allgemeiner Deutscher Fahrrad-Club München e.V.\n" +
     "Platenstraße 4\n" +
     "80336 München\n" +
-    "Tel. 089 | 46133830 (Mo. bis Mi. + Fr.)\n" +
+    "Tel. 089 | 46133830 (Mo. 10-11 Uhr, Fr. 12-13 Uhr)\n" +
     "radfahrschule@adfc-muenchen.de\n" +
     "https://muenchen.adfc.de/radfahrschule\n";
   GmailApp.sendEmail(empfaenger, subject, body);
 }
 
-function checkBuchung(e: Event) {
+function checkBuchung(e: SSEvent) {
   let range: GoogleAppsScript.Spreadsheet.Range = e.range;
   let sheet = range.getSheet();
   let row = range.getRow();
@@ -472,7 +475,7 @@ function checkBuchung(e: Event) {
 }
 
 function sendeAntwort(
-  e: Event,
+  e: SSEvent,
   msgs: Array<string>,
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
   row: number,
@@ -520,7 +523,7 @@ function sendeAntwort(
   GmailApp.sendEmail(emailTo, subject, textbody, options);
 }
 
-function anrede(e: Event) {
+function anrede(e: SSEvent) {
   // if Name is not set, nv["Name"] has value [""], i.e. not null, not [], not [null]!
   let anrede: string = e.namedValues["Anrede"][0];
   // let vorname: string = e.namedValues["Vorname"][0];
@@ -682,7 +685,7 @@ function updateForm() {
       else freiText = ", noch " + rest + " Plätze frei";
 
       let desc =
-        mr +
+        bolderizeWord(mr) +
         ", " +
         any2Str(kursObj["Datum"]) +
         ", " +
@@ -720,7 +723,7 @@ function sendWrongIbanEmail(anrede: string, empfaenger: string, iban: string) {
   var subject = "Falsche IBAN";
   var body =
     anrede +
-    ",\nDie von Ihnen bei der Buchung von ADFC Mehrtageskurse übermittelte IBAN " +
+    ",\nDie von Ihnen bei der Buchung von ADFC Fortgeschrittenenkursen übermittelte IBAN " +
     iban +
     " ist leider falsch! Bitte wiederholen Sie die Buchung mit einer korrekten IBAN.";
 
@@ -730,7 +733,7 @@ function sendWrongIbanEmail(anrede: string, empfaenger: string, iban: string) {
     "Allgemeiner Deutscher Fahrrad-Club München e.V.\n" +
     "Platenstraße 4\n" +
     "80336 München\n" +
-    "Tel. 089 | 46133830 (Mo. bis Mi. + Fr.)\n" +
+    "Tel. 089 | 46133830 (Mo. 10-11 Uhr, Fr. 12-13 Uhr)\n" +
     "radfahrschule@adfc-muenchen.de\n" +
     "https://muenchen.adfc.de/radfahrschule\n";
 
@@ -1007,3 +1010,73 @@ function printSelectedRange(kurs: string) {
     "Drucke Auswahl",
   );
 }
+
+function checkBuchungManually() {
+  if (!inited) init();
+  let sheet = SpreadsheetApp.getActiveSheet();
+  if (sheet.getName() != "Buchungen") {
+    SpreadsheetApp.getUi().alert(
+      "Bitte eine Zeile im Sheet 'Buchungen' selektieren",
+    );
+    return;
+  }
+  let curCell = sheet.getSelection().getCurrentCell();
+  if (!curCell) {
+    SpreadsheetApp.getUi().alert("Bitte zuerst Teilnehmerzeile selektieren");
+    return;
+  }
+  let rowIdx = curCell.getRow();
+  if (rowIdx < 2 || rowIdx > sheet.getLastRow()) {
+    SpreadsheetApp.getUi().alert(
+      "Die ausgewählte Zeile ist ungültig, bitte zuerst Teilnehmerzeile selektieren",
+    );
+    return;
+  }
+  let rowNote = sheet.getRange(rowIdx, 1).getNote();
+  if (!isEmpty(rowNote)) {
+    SpreadsheetApp.getUi().alert(
+      "Die ausgewählte Zeile hat eine Notiz und ist deshalb ungültig",
+    );
+    return;
+  }
+  let brange = sheet.getRange(rowIdx, 1, 1, sheet.getLastColumn());
+  let brow = brange.getValues()[0];
+  if (!isEmpty(brow[anmeldebestIndex - 1])) {
+    SpreadsheetApp.getUi().alert(
+      "Die ausgewählte Buchung wurde schon bestätigt",
+    );
+    return;
+  }
+
+  let e: SSEvent = {
+    namedValues: {
+      Name: [brow[nameIndex - 1]],
+      Anrede: [brow[herrFrauIndex - 1]],
+      "E-Mail-Adresse": [brow[mailIndex - 1]],
+      "Lastschrift: IBAN-Kontonummer": [
+        brow[headers["Buchungen"]["Lastschrift: IBAN-Kontonummer"] - 1],
+      ],
+      [kursFrage]: [brow[kursIndexB - 1]],
+    },
+    range: brange,
+  };
+  checkBuchung(e);
+}
+
+const upperDiff = "𝗔".codePointAt(0) - "A".codePointAt(0);
+const lowerDiff = "𝗮".codePointAt(0) - "a".codePointAt(0);
+const numberDiff = "𝟎".codePointAt(0) - "0".codePointAt(0);
+
+const isUpper = (n: number) => n >= 65 && n < 91;
+const isLower = (n: number) => n >= 97 && n < 123;
+const isNumber = (n: number) => n >= 48 && n < 58;
+
+const bolderize = (char: string) => {
+  const n = char.charCodeAt(0);
+  if (isUpper(n)) return String.fromCodePoint(n + upperDiff);
+  if (isLower(n)) return String.fromCodePoint(n + lowerDiff);
+  if (isNumber(n)) return String.fromCodePoint(n + numberDiff);
+  return char;
+};
+
+const bolderizeWord = (word: string) => [...word].map(bolderize).join("");
